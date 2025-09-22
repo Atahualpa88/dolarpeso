@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dólar en Argentina — Versión Portable</title>
+<meta name="description" content="Cotización del dólar en Argentina en tiempo real con fallback de CORS para abrir directo desde el celular." />
+<style>
+  :root{
+    --bg:#0b0f14; --card:#121823; --muted:#9fb0c0; --text:#e8f0f7;
+    --up:#1dd1a1; --down:#ff6b6b; --accent:#3da9fc; --border:#1f2937;
+    --badge:#223044;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
+    background:linear-gradient(180deg,#0b0f14 0%, #0e121a 60%, #0b0f14 100%);
+    color:var(--text);
+  }
+  header{
+    padding:24px 16px; border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:rgba(11,15,20,.8); backdrop-filter: blur(8px);
+    z-index:10;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:0 12px}
+  .title{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .logo{
+    width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+    background:radial-gradient(120% 120% at 10% 10%, #3da9fc 0%, #6ee7f3 30%, #223044 70%, #121823 100%);
+    box-shadow:0 10px 24px rgba(61,169,252,.15), inset 0 0 12px rgba(61,169,252,.3);
+    font-weight:700
+  }
+  h1{font-size:1.6rem;margin:0}
+  .muted{color:var(--muted); font-size:.95rem}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .badge{background:var(--badge); color:var(--muted); border:1px solid var(--border); padding:6px 10px; border-radius:999px; font-size:.85rem}
+  .btn{
+    background:transparent; color:var(--text); border:1px solid var(--border);
+    padding:8px 12px; border-radius:10px; cursor:pointer; transition:.2s;
+  }
+  .btn:hover{border-color:#334155; transform:translateY(-1px)}
+  main{padding:18px 0 40px}
+  .grid{
+    display:grid; gap:16px;
+    grid-template-columns: repeat(12, 1fr);
+  }
+  .card{
+    grid-column: span 12;
+    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    border:1px solid var(--border);
+    border-radius:16px; padding:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.03);
+  }
+  @media (min-width:720px){
+    .card{grid-column: span 6}
+  }
+  @media (min-width:1024px){
+    .card{grid-column: span 3}
+  }
+  .card header{display:flex;justify-content:space-between;align-items:center;padding:0;border:0;background:transparent;backdrop-filter:none;position:static}
+  .card h2{margin:0;font-size:1.05rem}
+  .pair{display:flex;gap:8px;align-items:baseline;margin-top:10px}
+  .value{font-size:1.9rem;font-weight:700;letter-spacing:.2px}
+  .chip{font-size:.8rem;padding:4px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+  .delta{font-size:.9rem}
+  .delta.up{color:var(--up)} .delta.down{color:var(--down)}
+  .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+  .kv{background:#0e1520; border:1px solid var(--border); padding:8px 10px; border-radius:8px; font-size:.9rem}
+  canvas{width:100%; height:80px; display:block; margin-top:10px}
+  footer{border-top:1px solid var(--border); padding:18px 0; color:var(--muted); font-size:.9rem}
+  .source{font-size:.8rem;color:var(--muted)}
+  .status{margin-left:auto}
+  .hint{margin-top:6px}
+  .error{color:var(--down)}
+</style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="title">
+        <div class="logo">$</div>
+        <div>
+          <h1>Cotización Dólar Argentina</h1>
+          <div class="muted">Versión portable con fallback CORS • Hora local: <span id="tz"></span></div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <span class="badge">Fuentes: CriptoYa · Bluelytics · Dolarsi</span>
+        <button class="btn" id="refreshBtn">Actualizar ahora</button>
+        <span class="badge status" id="status">Cargando…</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div class="grid" id="cards"></div>
+      <p class="hint muted" id="updatedAt">—</p>
+      <p class="hint muted" id="errorMsg"></p>
+      <details class="muted" style="margin-top:10px">
+        <summary>¿No carga?</summary>
+        <ul>
+          <li>Abrilo con conexión a internet.</li>
+          <li>Probá tocar <strong>Actualizar ahora</strong>.</li>
+          <li>Algunos navegadores bloquean pedidos desde <code>file://</code>. Esta versión intenta pasar por proxies públicos (AllOrigins / isomorphic-git).</li>
+          <li>Si sigue sin andar, subilo a un hosting estático o abrilo desde un servidor local.</li>
+        </ul>
+      </details>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div class="source">Educativo/informativo. Los valores pueden diferir de bancos/casas de cambio. Evitá usar proxies para producción: usá un backend propio.</div>
+    </div>
+  </footer>
+
+<script>
+/* ========= Utilidades ========= */
+const AR_TZ = "America/Argentina/Buenos_Aires";
+const fmt = new Intl.NumberFormat("es-AR", { style:"currency", currency:"ARS", maximumFractionDigits:2 });
+const dtFmt = new Intl.DateTimeFormat("es-AR",{ dateStyle:"medium", timeStyle:"medium", timeZone: AR_TZ });
+function nowART(){ return new Date(new Date().toLocaleString("en-US",{timeZone:AR_TZ})) }
+function setTZ(){ document.getElementById("tz").textContent = AR_TZ.replace("America/Argentina/","Argentina/"); }
+setTZ();
+
+/* ========= Fetch con fallback CORS ========= */
+const PROXIES = [
+  (url)=> url, // directo
+  (url)=> "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+  (url)=> "https://cors.isomorphic-git.org/" + url.replace(/^https?:\/\//,"")
+];
+
+async function fetchWithFallback(url, opts={}){
+  let lastErr=null;
+  for(const wrap of PROXIES){
+    const u = wrap(url);
+    try{
+      const r = await fetch(u, { ...opts, cache:"no-store" });
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const txt = await r.text();
+      // Intentar parseo JSON; si falla, tirar error para pasar al próximo proxy
+      try{
+        return JSON.parse(txt);
+      }catch{
+        // algunos proxies ya devuelven JSON parseable; otros texto. Si el original es texto JSON, parsea; si no, error
+        // Reintentar como JSON directo
+        return JSON.parse(txt);
+      }
+    }catch(e){
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("Falló fetchWithFallback");
+}
+
+/* ====== Config de tarjetas ====== */
+const PRODUCTS = [
+  { key:"oficial",  label:"Dólar Oficial" },
+  { key:"solidario",label:"Dólar Tarjeta / Solidario" },
+  { key:"blue",     label:"Dólar Blue" },
+  { key:"mep",      label:"Dólar MEP" },
+  { key:"ccl",      label:"Dólar CCL" }
+];
+
+/* ========= UI ========= */
+const grid = document.getElementById("cards");
+const statusEl = document.getElementById("status");
+const updatedEl = document.getElementById("updatedAt");
+const errEl = document.getElementById("errorMsg");
+
+function createCard(p){
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = \`
+    <header>
+      <h2>\${p.label}</h2>
+      <span class="chip" id="\${p.key}-source">—</span>
+    </header>
+    <div class="pair">
+      <div class="value" id="\${p.key}-value">—</div>
+      <div class="delta" id="\${p.key}-delta"></div>
+    </div>
+    <div class="row">
+      <div class="kv">Compra: <strong id="\${p.key}-buy">—</strong></div>
+      <div class="kv">Venta: <strong id="\${p.key}-sell">—</strong></div>
+    </div>
+    <canvas id="\${p.key}-spark" width="400" height="100"></canvas>
+  \`;
+  grid.appendChild(el);
+}
+PRODUCTS.forEach(createCard);
+
+/* ========= Historial (sparkline) ========= */
+const HIST_KEY = "dolar_hist_v1_portable";
+function loadHist(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY) || "{}"); } catch { return {}; } }
+function saveHist(hist){ localStorage.setItem(HIST_KEY, JSON.stringify(hist)); }
+function pushHist(hist, key, value){
+  if(!hist[key]) hist[key] = [];
+  hist[key].push({ t: Date.now(), v: value });
+  if(hist[key].length > 100) hist[key] = hist[key].slice(-100);
+}
+function drawSpark(canvas, series){
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!series || series.length < 2) return;
+  const W = canvas.width, H = canvas.height, P = 8;
+  const vals = series.map(d=>d.v);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const rng = (max - min) || 1;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  series.forEach((d,i)=>{
+    const x = P + (W-2*P) * (i/(series.length-1));
+    const y = H - P - (H-2*P) * ((d.v - min)/rng);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--accent");
+  ctx.stroke();
+}
+
+/* ========= Carga desde APIs (usando fetchWithFallback) ========= */
+async function fetchCriptoYa(){
+  const j = await fetchWithFallback("https://criptoya.com/api/dolar");
+  const out = {};
+  if(j.oficial){ out.oficial = { buy:j.oficial, sell:j.oficial, source:"CriptoYa", last: Date.now() }; }
+  if(j.solidario){ out.solidario = { buy:j.solidario, sell:j.solidario, source:"CriptoYa", last: Date.now() }; }
+  if(j.blue){ out.blue = { buy:j.blue, sell:j.blue, source:"CriptoYa", last: Date.now() }; }
+  if(j.mep){ out.mep = { buy:j.mep, sell:j.mep, source:"CriptoYa", last: Date.now() }; }
+  if(j.ccl){ out.ccl = { buy:j.ccl, sell:j.ccl, source:"CriptoYa", last: Date.now() }; }
+  return out;
+}
+
+async function fetchBluelytics(){
+  const j = await fetchWithFallback("https://api.bluelytics.com.ar/v2/latest");
+  const out = {};
+  if(j.oficial){
+    out.oficial = { buy:j.oficial.value_buy, sell:j.oficial.value_sell, source:"Bluelytics", last: Date.parse(j.last_update) || Date.now() };
+    out.solidario = { buy:j.oficial.value_sell*1.3, sell:j.oficial.value_sell*1.3, source:"Cálculo s/Oficial (Bluelytics)", last: out.oficial.last };
+  }
+  if(j.blue){
+    out.blue = { buy:j.blue.value_buy, sell:j.blue.value_sell, source:"Bluelytics", last: Date.parse(j.last_update) || Date.now() };
+  }
+  return out;
+}
+
+async function fetchDolarsi(){
+  const j = await fetchWithFallback("https://www.dolarsi.com/api/api.php?type=valoresprincipales");
+  const getVal = (nombre)=> j.find(x => x.casa && x.casa.nombre && x.casa.nombre.toLowerCase().includes(nombre));
+  const out = {};
+  const ofi = getVal("oficial");
+  if(ofi){
+    const buy = parseFloat((ofi.casa.compra||"0").replace(",","."));
+    const sell = parseFloat((ofi.casa.venta||"0").replace(",","."));
+    out.oficial = { buy, sell, source:"Dolarsi", last: Date.now() };
+    out.solidario = { buy: sell*1.3, sell: sell*1.3, source:"Cálculo s/Oficial (Dolarsi)", last: Date.now() };
+  }
+  const blu = getVal("blue");
+  if(blu){
+    const buy = parseFloat((blu.casa.compra||"0").replace(",","."));
+    const sell = parseFloat((blu.casa.venta||"0").replace(",","."));
+    out.blue = { buy, sell, source:"Dolarsi", last: Date.now() };
+  }
+  return out;
+}
+
+/* ========= Orquestación ========= */
+async function loadData(){
+  errEl.textContent = "";
+  statusEl.textContent = "Actualizando…";
+  let data = {};
+  const errors = [];
+  for(const fn of [fetchCriptoYa, fetchBluelytics, fetchDolarsi]){
+    try{
+      const chunk = await fn();
+      for(const k of Object.keys(chunk)){
+        if(!data[k]) data[k] = chunk[k];
+      }
+      const haveAll = ["oficial","solidario","blue","mep","ccl"].every(k => !!data[k]);
+      if(haveAll) break;
+    }catch(e){
+      errors.push(e.message);
+    }
+  }
+  if(Object.keys(data).length === 0){
+    throw new Error("No se pudo cargar ninguna fuente. Puede ser CORS. Detalles: " + errors.join(" | "));
+  }
+  return data;
+}
+
+function updateUI(data){
+  const hist = loadHist();
+  const ts = nowART();
+  updatedEl.textContent = "Última actualización: " + dtFmt.format(ts);
+
+  PRODUCTS.forEach(p=>{
+    const v = data[p.key];
+    const valueEl = document.getElementById(\`\${p.key}-value\`);
+    const buyEl = document.getElementById(\`\${p.key}-buy\`);
+    const sellEl = document.getElementById(\`\${p.key}-sell\`);
+    const srcEl = document.getElementById(\`\${p.key}-source\`);
+    const deltaEl = document.getElementById(\`\${p.key}-delta\`);
+    const spark = document.getElementById(\`\${p.key}-spark\`);
+
+    if(v){
+      const mid = (Number(v.buy)||0 + Number(v.sell)||0)/2 || Number(v.sell)||Number(v.buy)||0;
+      valueEl.textContent = fmt.format(mid);
+      buyEl.textContent = fmt.format(v.buy);
+      sellEl.textContent = fmt.format(v.sell);
+      srcEl.textContent = v.source || "—";
+
+      const prev = (hist[p.key] && hist[p.key].length) ? hist[p.key][hist[p.key].length-1].v : null;
+      let deltaTxt = "";
+      if(prev != null){
+        const diff = mid - prev;
+        const pct = prev ? (diff/prev)*100 : 0;
+        if(Math.abs(diff) < 0.01){ deltaTxt = "sin cambios"; deltaEl.className="delta"; }
+        else if(diff > 0){ deltaTxt = \`▲ \${fmt.format(diff)} (\${pct.toFixed(2)}%)\`; deltaEl.className="delta up"; }
+        else { deltaTxt = \`▼ \${fmt.format(Math.abs(diff))} (\${Math.abs(pct).toFixed(2)}%)\`; deltaEl.className="delta down"; }
+      }
+      deltaEl.textContent = deltaTxt;
+
+      pushHist(hist, p.key, mid);
+      drawSpark(spark, hist[p.key]);
+    } else {
+      valueEl.textContent = "—";
+      buyEl.textContent = "—";
+      sellEl.textContent = "—";
+      srcEl.textContent = "Sin datos";
+      deltaEl.textContent = "";
+      const ctx = spark.getContext("2d"); ctx.clearRect(0,0,spark.width,spark.height);
+    }
+  });
+  saveHist(hist);
+}
+
+let timer = null;
+async function refresh(){
+  try{
+    const data = await loadData();
+    updateUI(data);
+    statusEl.textContent = "OK";
+  }catch(err){
+    statusEl.textContent = "Error";
+    errEl.innerHTML = \`<span class="error">⚠️ \${err.message}</span>\`;
+  }
+}
+
+document.getElementById("refreshBtn").addEventListener("click", refresh);
+setInterval(refresh, 60000);
+refresh();
+</script>
+</body>
+</html>
